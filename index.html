@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>群馬県 人口動態ダッシュボード</title>
+  <meta name="description" content="群馬県移動人口調査（月次）のオープンデータを可視化したダッシュボード">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="data/population.js"></script>
+  <script src="data/gunma.geojson.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:           #f0fafa;
+      --card:         #ffffff;
+      --border:       #cce8e8;
+      --text:         #0f2020;
+      --text-muted:   #5c7a7a;
+      --accent:       #0f766e;
+      --accent-light: #ccfbf1;
+      --red:          #dc2626;
+      --blue:         #2563eb;
+      --green:        #16a34a;
+      --orange:       #ea580c;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Hiragino Sans', 'Meiryo', sans-serif; font-size: 14px; }
+
+    /* Header */
+    .header {
+      background: var(--accent); color: #fff;
+      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+    .header h1 { font-size: 17px; font-weight: 700; }
+    .header .sub { font-size: 11px; opacity: .8; margin-top: 2px; }
+    .header-right { margin-left: auto; font-size: 11px; opacity: .75; }
+
+    /* Month nav */
+    .month-nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 10px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .month-nav label { font-size: 12px; color: var(--text-muted); }
+    .month-btn {
+      padding: 4px 12px; border: 1px solid var(--border); border-radius: 16px;
+      background: var(--bg); font-size: 12px; cursor: pointer; color: var(--text);
+    }
+    .month-btn:hover, .month-btn.active {
+      background: var(--accent); color: #fff; border-color: var(--accent);
+    }
+    #month-select {
+      padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; background: var(--card); color: var(--text);
+    }
+
+    /* Main */
+    .main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    /* Cards */
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 18px; border-top: 3px solid var(--accent);
+    }
+    .stat-card .label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+    .stat-card .value { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+    .stat-card .sub-val { font-size: 12px; margin-top: 4px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+
+    /* Section layout */
+    .section { margin-bottom: 20px; }
+    .row { display: grid; gap: 16px; margin-bottom: 16px; }
+    .row-1 { grid-template-columns: 1fr; }
+    .row-2 { grid-template-columns: 1fr 1fr; }
+    .row-2-3 { grid-template-columns: 2fr 1fr; }
+    @media (max-width: 860px) { .row-2, .row-2-3 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .card-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--text-muted); margin-bottom: 14px;
+    }
+    .chart-wrap { position: relative; height: 260px; }
+    .chart-wrap-lg { position: relative; height: 300px; }
+    .chart-wrap-sm { position: relative; height: 220px; }
+
+    /* Map */
+    #map-pop { height: 360px; border-radius: 8px; z-index: 0; }
+    .leaflet-pane { z-index: 1 !important; }
+    .leaflet-control { z-index: 2 !important; }
+    .leaflet-top, .leaflet-bottom { z-index: 2 !important; }
+
+    /* Toggle buttons */
+    .toggle-group { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .toggle-btn {
+      padding: 4px 12px; font-size: 11px; border-radius: 14px;
+      border: 1px solid var(--accent); background: #fff; color: var(--accent); cursor: pointer;
+    }
+    .toggle-btn.active { background: var(--accent); color: #fff; }
+
+    /* Map legend */
+    .map-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+
+    /* Source */
+    .source { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .source a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>群馬県 人口動態ダッシュボード</h1>
+    <div class="sub">移動人口調査（月次）オープンデータ</div>
+  </div>
+  <div class="header-right" id="header-month"></div>
+</div>
+
+<div class="month-nav">
+  <label>表示月：</label>
+  <select id="month-select"></select>
+  <div style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="data-range"></div>
+</div>
+
+<div class="main">
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="stat-card">
+      <div class="label">総人口（県計）</div>
+      <div class="value" id="card-pop">–</div>
+      <div class="sub-val" id="card-pop-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">前月比 増減</div>
+      <div class="value" id="card-change">–</div>
+      <div class="sub-val" id="card-change-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">転入超過数</div>
+      <div class="value" id="card-net">–</div>
+      <div class="sub-val" id="card-net-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">世帯数</div>
+      <div class="value" id="card-hh">–</div>
+      <div class="sub-val" id="card-hh-sub"></div>
+    </div>
+  </div>
+
+  <!-- Trend -->
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+        人口推移
+        <div class="toggle-group" style="margin:0;margin-left:auto">
+          <button class="toggle-btn active" id="btn-trend-pop" onclick="setTrendMode('pop')">総人口</button>
+          <button class="toggle-btn" id="btn-trend-change" onclick="setTrendMode('change')">前月増減</button>
+          <button class="toggle-btn" id="btn-trend-vital" onclick="setTrendMode('vital')">自然・社会増減</button>
+        </div>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="chart-trend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Map + Migration -->
+  <div class="row row-2">
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+        市区町村別マップ
+        <div class="toggle-group" style="margin:0;margin-left:auto">
+          <button class="toggle-btn active" id="btn-map-pop" onclick="setMapMode('pop')">人口</button>
+          <button class="toggle-btn" id="btn-map-net" onclick="setMapMode('net')">転入超過</button>
+        </div>
+      </div>
+      <div id="map-pop"></div>
+      <div class="map-legend" id="map-legend-pop">
+        <span>少</span>
+        <div style="width:16px;height:10px;background:#e0f2fe;border:1px solid #ccc"></div>
+        <div style="width:16px;height:10px;background:#7dd3fc"></div>
+        <div style="width:16px;height:10px;background:#0ea5e9"></div>
+        <div style="width:16px;height:10px;background:#0369a1"></div>
+        <div style="width:16px;height:10px;background:#0c4a6e"></div>
+        <span>多</span>
+      </div>
+      <div class="map-legend" id="map-legend-net" style="display:none">
+        <span>転出超</span>
+        <div style="width:16px;height:10px;background:#fca5a5"></div>
+        <div style="width:16px;height:10px;background:#f87171"></div>
+        <div style="width:16px;height:10px;background:#d4d4d4;border:1px solid #ccc"></div>
+        <div style="width:16px;height:10px;background:#86efac"></div>
+        <div style="width:16px;height:10px;background:#16a34a"></div>
+        <span>転入超</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">転入・転出バランス（市区町村別）</div>
+      <div class="chart-wrap-lg"><canvas id="chart-migration"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Natural vs Social -->
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title">自然増減・社会増減 内訳（主要市）</div>
+      <div class="chart-wrap"><canvas id="chart-vital"></canvas></div>
+    </div>
+  </div>
+
+  <div class="source">
+    出典：<a href="https://toukei.pref.gunma.jp/idj/" target="_blank">群馬県移動人口調査</a>（群馬県総務部統計課）／
+    地図：<a href="https://nlftp.mlit.go.jp/ksj/" target="_blank">国土数値情報</a>（国土交通省）・<a href="https://github.com/niiyz/JapanCityGeoJson" target="_blank">JapanCityGeoJson</a>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  Helpers
+// =====================================================================
+const fmt  = n => n == null ? '–' : n.toLocaleString('ja-JP');
+const fmtM = ym => `${ym.slice(0,4)}年${parseInt(ym.slice(4),10)}月`;
+const sign = n => n > 0 ? `+${fmt(n)}` : fmt(n);
+const cls  = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+
+// =====================================================================
+//  State
+// =====================================================================
+let currentMonth, trendMode = 'pop', mapMode = 'pop';
+let leafletMap = null, geojsonLayer = null;
+const charts = {};
+
+function initMonthSelect() {
+  const D   = window.POP_DATA;
+  const sel = document.getElementById('month-select');
+  [...D.months].reverse().forEach(ym => {
+    const o = document.createElement('option');
+    o.value = ym; o.textContent = fmtM(ym);
+    sel.appendChild(o);
+  });
+  currentMonth = D.meta.latest;
+  sel.value    = currentMonth;
+  sel.addEventListener('change', () => { currentMonth = sel.value; renderAll(); });
+
+  document.getElementById('header-month').textContent = `${fmtM(currentMonth)} 現在`;
+  document.getElementById('data-range').textContent =
+    `データ期間: ${fmtM(D.months[0])} ～ ${fmtM(D.months[D.months.length-1])}`;
+}
+
+// =====================================================================
+//  Cards
+// =====================================================================
+function renderCards() {
+  const D   = window.POP_DATA;
+  const d   = D.prefecture[currentMonth];
+  const months = D.months;
+  const prevIdx = months.indexOf(currentMonth) - 1;
+  const prev    = prevIdx >= 0 ? D.prefecture[months[prevIdx]] : null;
+
+  if (!d) return;
+
+  document.getElementById('card-pop').textContent  = fmt(d.pop);
+  document.getElementById('card-pop-sub').innerHTML =
+    `<span class="${cls(d.change)}">${sign(d.change)}人 前月比</span>`;
+
+  const nat = d.births - d.deaths;
+  document.getElementById('card-change').textContent = sign(d.change);
+  document.getElementById('card-change-sub').innerHTML =
+    `自然: <span class="${cls(nat)}">${sign(nat)}</span> ／ 社会: <span class="${cls(d.inflow-d.outflow)}">${sign(d.inflow-d.outflow)}</span>`;
+
+  const net = d.inflow - d.outflow;
+  document.getElementById('card-net').innerHTML =
+    `<span class="${cls(net)}">${sign(net)}</span>`;
+  document.getElementById('card-net-sub').textContent =
+    `転入 ${fmt(d.inflow)} ／ 転出 ${fmt(d.outflow)}`;
+
+  document.getElementById('card-hh').textContent = fmt(d.households);
+  document.getElementById('card-hh-sub').innerHTML =
+    prev ? `<span class="${cls(d.hhChange)}">${sign(d.hhChange)} 世帯 前月比</span>` : '';
+
+  document.getElementById('header-month').textContent = `${fmtM(currentMonth)} 現在`;
+}
+
+// =====================================================================
+//  Trend Chart
+// =====================================================================
+function setTrendMode(mode) {
+  trendMode = mode;
+  ['pop','change','vital'].forEach(m => {
+    document.getElementById(`btn-trend-${m}`).classList.toggle('active', m === mode);
+  });
+  renderTrend();
+}
+
+function renderTrend() {
+  const D      = window.POP_DATA;
+  const months = D.months;
+  const labels = months.map(fmtM);
+  const pref   = months.map(ym => D.prefecture[ym]);
+
+  if (charts.trend) charts.trend.destroy();
+  const ctx = document.getElementById('chart-trend').getContext('2d');
+
+  if (trendMode === 'pop') {
+    charts.trend = new Chart(ctx, { type: 'line', data: {
+      labels,
+      datasets: [{
+        label: '総人口', data: pref.map(d => d?.pop),
+        borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,.12)',
+        fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2
+      }]
+    }, options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+        y: { ticks: { callback: v => `${(v/10000).toFixed(0)}万`, font: { size: 10 } } }
+      }
+    }});
+  } else if (trendMode === 'change') {
+    charts.trend = new Chart(ctx, { type: 'bar', data: {
+      labels,
+      datasets: [{
+        label: '前月増減', data: pref.map(d => d?.change),
+        backgroundColor: pref.map(d => (d?.change ?? 0) >= 0 ? 'rgba(22,163,74,.7)' : 'rgba(220,38,38,.7)'),
+        borderRadius: 2
+      }]
+    }, options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }});
+  } else { // vital
+    charts.trend = new Chart(ctx, { type: 'bar', data: {
+      labels,
+      datasets: [
+        { label: '自然増減', data: pref.map(d => d ? d.births - d.deaths : null),
+          backgroundColor: 'rgba(239,68,68,.7)', stack: 'a', borderRadius: 2 },
+        { label: '社会増減', data: pref.map(d => d ? d.inflow - d.outflow : null),
+          backgroundColor: 'rgba(37,99,235,.7)', stack: 'b', borderRadius: 2 }
+      ]
+    }, options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }});
+  }
+}
+
+// =====================================================================
+//  Map
+// =====================================================================
+function setMapMode(mode) {
+  mapMode = mode;
+  ['pop','net'].forEach(m => {
+    document.getElementById(`btn-map-${m}`).classList.toggle('active', m === mode);
+  });
+  document.getElementById('map-legend-pop').style.display = mode === 'pop' ? 'flex' : 'none';
+  document.getElementById('map-legend-net').style.display = mode === 'net' ? 'flex' : 'none';
+  renderMap();
+}
+
+function getPopColor(ratio) {
+  if (ratio > 0.6) return '#0c4a6e';
+  if (ratio > 0.4) return '#0369a1';
+  if (ratio > 0.2) return '#0ea5e9';
+  if (ratio > 0.05) return '#7dd3fc';
+  return '#e0f2fe';
+}
+
+function getNetColor(net, absMax) {
+  if (absMax === 0) return '#d4d4d4';
+  const r = net / absMax;
+  if (r > 0.3) return '#16a34a';
+  if (r > 0.05) return '#86efac';
+  if (r >= -0.05) return '#d4d4d4';
+  if (r >= -0.3) return '#f87171';
+  return '#fca5a5';
+}
+
+function renderMap() {
+  if (typeof L === 'undefined' || !window.GUNMA_GEOJSON) return;
+  const D      = window.POP_DATA;
+  const cities = D.cities;
+
+  const vals = Object.keys(cities).map(name => {
+    const d = cities[name][currentMonth];
+    if (!d) return 0;
+    return mapMode === 'pop' ? d.pop : (d.inflow - d.outflow);
+  });
+  const maxPop = Math.max(1, ...vals.filter(v => v > 0));
+  const absMax = Math.max(1, ...vals.map(Math.abs));
+
+  if (!leafletMap) {
+    leafletMap = L.map('map-pop', { zoomControl: true })
+      .setView([36.55, 138.95], 9);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors © CARTO', maxZoom: 15
+    }).addTo(leafletMap);
+  }
+
+  if (geojsonLayer) { geojsonLayer.remove(); geojsonLayer = null; }
+
+  geojsonLayer = L.geoJSON(window.GUNMA_GEOJSON, {
+    style: feature => {
+      const name = feature.properties.name;
+      const d    = cities[name]?.[currentMonth];
+      let fill = '#e0e0e0';
+      let opacity = 0.3;
+      if (d) {
+        opacity = 0.8;
+        if (mapMode === 'pop') {
+          fill = getPopColor(d.pop / maxPop);
+        } else {
+          fill = getNetColor(d.inflow - d.outflow, absMax);
+        }
+      }
+      return { fillColor: fill, fillOpacity: opacity, color: '#888', weight: 0.7, opacity: 1 };
+    },
+    onEachFeature: (feature, layer) => {
+      const name = feature.properties.name;
+      const d    = cities[name]?.[currentMonth];
+      layer.on('mouseover', function(e) {
+        this.setStyle({ weight: 2.5, color: '#333' });
+        if (!d) { this.bindTooltip(`<strong>${name}</strong>: データなし`, { sticky: true }).openTooltip(e.latlng); return; }
+        const net = d.inflow - d.outflow;
+        const nat = d.births - d.deaths;
+        this.bindTooltip(
+          `<strong>${name}</strong><br>人口: ${fmt(d.pop)} 人<br>前月比: <span style="color:${d.change>=0?'#16a34a':'#dc2626'}">${sign(d.change)}</span><br>自然増減: ${sign(nat)} ／ 社会増減: ${sign(net)}`,
+          { sticky: true }
+        ).openTooltip(e.latlng);
+      });
+      layer.on('mouseout', function() {
+        geojsonLayer.resetStyle(this); this.closeTooltip();
+      });
+    }
+  }).addTo(leafletMap);
+}
+
+// =====================================================================
+//  Migration Bar Chart
+// =====================================================================
+function renderMigration() {
+  const D      = window.POP_DATA;
+  const cities = D.cities;
+
+  const data = Object.keys(cities)
+    .map(name => {
+      const d = cities[name][currentMonth];
+      return d ? { name, net: d.inflow - d.outflow, inflow: d.inflow, outflow: d.outflow } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.net - a.net);
+
+  if (charts.migration) charts.migration.destroy();
+  const ctx = document.getElementById('chart-migration').getContext('2d');
+  charts.migration = new Chart(ctx, { type: 'bar',
+    data: {
+      labels: data.map(d => d.name),
+      datasets: [{
+        label: '転入超過数',
+        data: data.map(d => d.net),
+        backgroundColor: data.map(d => d.net >= 0 ? 'rgba(22,163,74,.75)' : 'rgba(220,38,38,.75)'),
+        borderRadius: 3
+      }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: item => {
+          const d = data[item.dataIndex];
+          return [`転入超過: ${sign(item.raw)}人`, `転入: ${fmt(d.inflow)} ／ 転出: ${fmt(d.outflow)}`];
+        }}}
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// =====================================================================
+//  Vital Statistics Bar
+// =====================================================================
+function renderVital() {
+  const D      = window.POP_DATA;
+  const cities = D.cities;
+
+  // 主要12市のみ（人口降順）
+  const data = Object.keys(cities)
+    .map(name => {
+      const d = cities[name][currentMonth];
+      return d ? { name, pop: d.pop, nat: d.births - d.deaths, soc: d.inflow - d.outflow } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.pop - a.pop)
+    .slice(0, 12);
+
+  if (charts.vital) charts.vital.destroy();
+  const ctx = document.getElementById('chart-vital').getContext('2d');
+  charts.vital = new Chart(ctx, { type: 'bar',
+    data: {
+      labels: data.map(d => d.name),
+      datasets: [
+        { label: '自然増減（出生-死亡）', data: data.map(d => d.nat),
+          backgroundColor: 'rgba(239,68,68,.75)', borderRadius: 3 },
+        { label: '社会増減（転入-転出）', data: data.map(d => d.soc),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 3 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { font: { size: 11 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// =====================================================================
+//  Render All
+// =====================================================================
+function renderAll() {
+  document.getElementById('header-month').textContent = `${fmtM(currentMonth)} 現在`;
+  renderCards();
+  renderTrend();
+  renderMap();
+  renderMigration();
+  renderVital();
+}
+
+// =====================================================================
+//  Init
+// =====================================================================
+window.addEventListener('load', () => {
+  if (!window.POP_DATA) { document.body.innerHTML = '<p style="padding:2em">データ読み込みエラー</p>'; return; }
+  initMonthSelect();
+  renderAll();
+});
+</script>
+</body>
+</html>
