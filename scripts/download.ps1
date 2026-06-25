@@ -7,10 +7,13 @@ $baseUrl  = 'https://toukei.pref.gunma.jp/idj/data'
 $cacheDir = 'C:\Users\tkudo\gunma_pop\data\csv'
 $outFile  = 'C:\Users\tkudo\gunma_pop\data\population.js'
 
-# 対象年月 (2016/01 - 2026/05)
+# 対象年月 (2016/01 - 当月)
+$today = Get-Date
+$endY  = $today.Year
+$endM  = $today.Month
 $months = @()
-for ($y = 2016; $y -le 2026; $y++) {
-    $maxM = if ($y -eq 2026) { 5 } else { 12 }
+for ($y = 2016; $y -le $endY; $y++) {
+    $maxM = if ($y -eq $endY) { $endM } else { 12 }
     for ($m = 1; $m -le $maxM; $m++) { $months += '{0}{1:D2}' -f $y, $m }
 }
 
