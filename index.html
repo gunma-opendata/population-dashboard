@@ -59,8 +59,16 @@
     .main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
 
     /* Cards */
-    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .summary-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 20px; align-items: start; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    @media (max-width: 860px) { .summary-row { grid-template-columns: 1fr; } }
     @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+    .gender-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 18px; border-top: 3px solid var(--accent); min-width: 180px;
+    }
+    .gender-card .label { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .gender-donut-wrap { position: relative; height: 130px; }
     .stat-card {
       background: var(--card); border: 1px solid var(--border); border-radius: 10px;
       padding: 16px 18px; border-top: 3px solid var(--accent);
@@ -126,43 +134,60 @@
 <div class="month-nav">
   <label>表示月：</label>
   <select id="month-select"></select>
+  <label style="margin-left:8px">市区町村：</label>
+  <select id="city-select"></select>
   <div style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="data-range"></div>
 </div>
 
 <div class="main">
   <!-- Summary Cards -->
-  <div class="summary-grid">
-    <div class="stat-card">
-      <div class="label">総人口（県計）</div>
-      <div class="value" id="card-pop">–</div>
-      <div class="sub-val" id="card-pop-sub"></div>
+  <div class="summary-row">
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="label" id="label-pop">総人口（県計）</div>
+        <div class="value" id="card-pop">–</div>
+        <div class="sub-val" id="card-pop-sub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">前月比 増減</div>
+        <div class="value" id="card-change">–</div>
+        <div class="sub-val" id="card-change-sub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">転入超過数</div>
+        <div class="value" id="card-net">–</div>
+        <div class="sub-val" id="card-net-sub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">世帯数</div>
+        <div class="value" id="card-hh">–</div>
+        <div class="sub-val" id="card-hh-sub"></div>
+      </div>
     </div>
-    <div class="stat-card">
-      <div class="label">前月比 増減</div>
-      <div class="value" id="card-change">–</div>
-      <div class="sub-val" id="card-change-sub"></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">転入超過数</div>
-      <div class="value" id="card-net">–</div>
-      <div class="sub-val" id="card-net-sub"></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">世帯数</div>
-      <div class="value" id="card-hh">–</div>
-      <div class="sub-val" id="card-hh-sub"></div>
+    <!-- Gender Donut -->
+    <div class="gender-card">
+      <div class="label">男女比</div>
+      <div class="gender-donut-wrap"><canvas id="chart-gender"></canvas></div>
+      <div id="gender-legend" style="font-size:11px;text-align:center;margin-top:6px;color:var(--text-muted)"></div>
     </div>
   </div>
 
   <!-- Trend -->
   <div class="row row-1">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         人口推移
+        <div class="toggle-group" style="margin:0">
+          <button class="toggle-btn" id="btn-range-12" onclick="setTrendRange(12)">1年</button>
+          <button class="toggle-btn" id="btn-range-36" onclick="setTrendRange(36)">3年</button>
+          <button class="toggle-btn" id="btn-range-60" onclick="setTrendRange(60)">5年</button>
+          <button class="toggle-btn active" id="btn-range-0" onclick="setTrendRange(0)">全期間</button>
+        </div>
         <div class="toggle-group" style="margin:0;margin-left:auto">
           <button class="toggle-btn active" id="btn-trend-pop" onclick="setTrendMode('pop')">総人口</button>
           <button class="toggle-btn" id="btn-trend-change" onclick="setTrendMode('change')">前月増減</button>
           <button class="toggle-btn" id="btn-trend-vital" onclick="setTrendMode('vital')">自然・社会増減</button>
+          <button class="toggle-btn" id="btn-trend-hh" onclick="setTrendMode('hh')">世帯数</button>
         </div>
       </div>
       <div class="chart-wrap-lg"><canvas id="chart-trend"></canvas></div>
@@ -202,7 +227,8 @@
 
     <div class="card">
       <div class="card-title">転入・転出バランス（市区町村別）</div>
-      <div class="chart-wrap-lg"><canvas id="chart-migration"></canvas></div>
+      <div class="chart-wrap-lg" id="chart-migration-wrap"><canvas id="chart-migration"></canvas></div>
+      <p id="chart-migration-msg" style="display:none;padding:16px 0;color:var(--text-muted);font-size:12px">転入・転出データがありません</p>
     </div>
   </div>
 
@@ -211,6 +237,7 @@
     <div class="card">
       <div class="card-title">自然増減・社会増減 内訳（主要市）</div>
       <div class="chart-wrap"><canvas id="chart-vital"></canvas></div>
+      <p id="chart-vital-msg" style="display:none;padding:16px 0;color:var(--text-muted);font-size:12px">自然・社会増減データがありません</p>
     </div>
   </div>
 
@@ -232,7 +259,7 @@ const cls  = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
 // =====================================================================
 //  State
 // =====================================================================
-let currentMonth, trendMode = 'pop', mapMode = 'pop';
+let currentMonth, trendMode = 'pop', trendRange = 0, mapMode = 'pop', currentCity = null;
 let leafletMap = null, geojsonLayer = null;
 const charts = {};
 
@@ -253,15 +280,34 @@ function initMonthSelect() {
     `データ期間: ${fmtM(D.months[0])} ～ ${fmtM(D.months[D.months.length-1])}`;
 }
 
+function initCitySelect() {
+  const D   = window.POP_DATA;
+  const sel = document.getElementById('city-select');
+  const all = document.createElement('option');
+  all.value = ''; all.textContent = '全県';
+  sel.appendChild(all);
+  Object.keys(D.cities).forEach(name => {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => {
+    currentCity = sel.value || null;
+    renderAll();
+  });
+}
+
 // =====================================================================
 //  Cards
 // =====================================================================
 function renderCards() {
   const D   = window.POP_DATA;
-  const d   = D.prefecture[currentMonth];
+  const src = currentCity ? D.cities[currentCity] : D.prefecture;
+  const d   = src[currentMonth];
   const months = D.months;
   const prevIdx = months.indexOf(currentMonth) - 1;
-  const prev    = prevIdx >= 0 ? D.prefecture[months[prevIdx]] : null;
+  const prev    = prevIdx >= 0 ? src[months[prevIdx]] : null;
+  document.getElementById('label-pop').textContent = `総人口（${currentCity || '県計'}）`;
 
   if (!d) return;
 
@@ -290,9 +336,17 @@ function renderCards() {
 // =====================================================================
 //  Trend Chart
 // =====================================================================
+function setTrendRange(n) {
+  trendRange = n;
+  [0, 12, 36, 60].forEach(r => {
+    document.getElementById(`btn-range-${r}`).classList.toggle('active', r === n);
+  });
+  renderTrend();
+}
+
 function setTrendMode(mode) {
   trendMode = mode;
-  ['pop','change','vital'].forEach(m => {
+  ['pop','change','vital','hh'].forEach(m => {
     document.getElementById(`btn-trend-${m}`).classList.toggle('active', m === mode);
   });
   renderTrend();
@@ -300,9 +354,12 @@ function setTrendMode(mode) {
 
 function renderTrend() {
   const D      = window.POP_DATA;
-  const months = D.months;
+  const allMonths = D.months;
+  const sliced = trendRange > 0 ? allMonths.slice(-trendRange) : allMonths;
+  const months = sliced;
   const labels = months.map(fmtM);
-  const pref   = months.map(ym => D.prefecture[ym]);
+  const src    = currentCity ? D.cities[currentCity] : D.prefecture;
+  const pref   = months.map(ym => src[ym]);
 
   if (charts.trend) charts.trend.destroy();
   const ctx = document.getElementById('chart-trend').getContext('2d');
@@ -337,13 +394,33 @@ function renderTrend() {
         y: { ticks: { font: { size: 10 } } }
       }
     }});
+  } else if (trendMode === 'hh') {
+    charts.trend = new Chart(ctx, { type: 'line', data: {
+      labels,
+      datasets: [
+        { label: '世帯数', data: pref.map(d => d?.households),
+          borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,.1)',
+          fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'y' },
+        { label: '世帯増減', data: pref.map(d => d?.hhChange),
+          borderColor: '#f59e0b', backgroundColor: 'transparent',
+          tension: 0.3, pointRadius: 2, borderWidth: 1.5, borderDash: [4,3], yAxisID: 'y2' }
+      ]
+    }, options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+        y:  { position: 'left',  ticks: { callback: v => `${(v/10000).toFixed(1)}万`, font: { size: 10 } } },
+        y2: { position: 'right', grid: { drawOnChartArea: false },
+              ticks: { font: { size: 10 } }, title: { display: true, text: '増減', font: { size: 10 } } }
+      }
+    }});
   } else { // vital
     charts.trend = new Chart(ctx, { type: 'bar', data: {
       labels,
       datasets: [
-        { label: '自然増減', data: pref.map(d => d ? d.births - d.deaths : null),
+        { label: '自然増減', data: pref.map(d => d && d.births !== null ? d.births - d.deaths : null),
           backgroundColor: 'rgba(239,68,68,.7)', stack: 'a', borderRadius: 2 },
-        { label: '社会増減', data: pref.map(d => d ? d.inflow - d.outflow : null),
+        { label: '社会増減', data: pref.map(d => d && d.inflow !== null ? d.inflow - d.outflow : null),
           backgroundColor: 'rgba(37,99,235,.7)', stack: 'b', borderRadius: 2 }
       ]
     }, options: { responsive: true, maintainAspectRatio: false,
@@ -424,7 +501,8 @@ function renderMap() {
           fill = getNetColor(d.inflow - d.outflow, absMax);
         }
       }
-      return { fillColor: fill, fillOpacity: opacity, color: '#888', weight: 0.7, opacity: 1 };
+      const isSelected = name === currentCity;
+      return { fillColor: fill, fillOpacity: opacity, color: isSelected ? '#f59e0b' : '#888', weight: isSelected ? 2.5 : 0.7, opacity: 1 };
     },
     onEachFeature: (feature, layer) => {
       const name = feature.properties.name;
@@ -432,15 +510,21 @@ function renderMap() {
       layer.on('mouseover', function(e) {
         this.setStyle({ weight: 2.5, color: '#333' });
         if (!d) { this.bindTooltip(`<strong>${name}</strong>: データなし`, { sticky: true }).openTooltip(e.latlng); return; }
-        const net = d.inflow - d.outflow;
-        const nat = d.births - d.deaths;
+      const net = d.inflow != null ? d.inflow - d.outflow : null;
+        const nat = d.births != null ? d.births - d.deaths : null;
         this.bindTooltip(
-          `<strong>${name}</strong><br>人口: ${fmt(d.pop)} 人<br>前月比: <span style="color:${d.change>=0?'#16a34a':'#dc2626'}">${sign(d.change)}</span><br>自然増減: ${sign(nat)} ／ 社会増減: ${sign(net)}`,
+          `<strong>${name}</strong><br>人口: ${fmt(d.pop)} 人<br>前月比: <span style="color:${d.change>=0?'#16a34a':'#dc2626'}">${sign(d.change)}</span>` +
+          (nat != null ? `<br>自然増減: ${sign(nat)} ／ 社会増減: ${sign(net)}` : ''),
           { sticky: true }
         ).openTooltip(e.latlng);
       });
       layer.on('mouseout', function() {
         geojsonLayer.resetStyle(this); this.closeTooltip();
+      });
+      layer.on('click', function() {
+        currentCity = currentCity === name ? null : name;
+        document.getElementById('city-select').value = currentCity || '';
+        renderAll();
       });
     }
   }).addTo(leafletMap);
@@ -456,13 +540,22 @@ function renderMigration() {
   const data = Object.keys(cities)
     .map(name => {
       const d = cities[name][currentMonth];
-      return d ? { name, net: d.inflow - d.outflow, inflow: d.inflow, outflow: d.outflow } : null;
+      return d && d.inflow != null ? { name, net: d.inflow - d.outflow, inflow: d.inflow, outflow: d.outflow } : null;
     })
     .filter(Boolean)
     .sort((a, b) => b.net - a.net);
 
   if (charts.migration) charts.migration.destroy();
   const ctx = document.getElementById('chart-migration').getContext('2d');
+  const migMsg = document.getElementById('chart-migration-msg');
+  if (!data.length) {
+    document.getElementById('chart-migration').style.display = 'none';
+    migMsg.style.display = 'block';
+    return;
+  }
+  document.getElementById('chart-migration').style.display = '';
+  migMsg.style.display = 'none';
+  document.getElementById('chart-migration-wrap').style.height = (data.length * 24 + 50) + 'px';
   charts.migration = new Chart(ctx, { type: 'bar',
     data: {
       labels: data.map(d => d.name),
@@ -482,7 +575,10 @@ function renderMigration() {
       },
       scales: {
         x: { ticks: { font: { size: 10 } } },
-        y: { ticks: { font: { size: 10 } } }
+        y: {
+          afterFit(scale) { scale.width = 80; },
+          ticks: { font: { size: 10 }, autoSkip: false }
+        }
       }
     }
   });
@@ -499,7 +595,7 @@ function renderVital() {
   const data = Object.keys(cities)
     .map(name => {
       const d = cities[name][currentMonth];
-      return d ? { name, pop: d.pop, nat: d.births - d.deaths, soc: d.inflow - d.outflow } : null;
+      return d && d.births != null ? { name, pop: d.pop, nat: d.births - d.deaths, soc: d.inflow - d.outflow } : null;
     })
     .filter(Boolean)
     .sort((a, b) => b.pop - a.pop)
@@ -507,6 +603,14 @@ function renderVital() {
 
   if (charts.vital) charts.vital.destroy();
   const ctx = document.getElementById('chart-vital').getContext('2d');
+  const vitMsg = document.getElementById('chart-vital-msg');
+  if (!data.length) {
+    document.getElementById('chart-vital').style.display = 'none';
+    vitMsg.style.display = 'block';
+    return;
+  }
+  document.getElementById('chart-vital').style.display = '';
+  vitMsg.style.display = 'none';
   charts.vital = new Chart(ctx, { type: 'bar',
     data: {
       labels: data.map(d => d.name),
@@ -528,11 +632,49 @@ function renderVital() {
 }
 
 // =====================================================================
+//  Gender Donut
+// =====================================================================
+function renderGender() {
+  const D   = window.POP_DATA;
+  const src = currentCity ? D.cities[currentCity] : D.prefecture;
+  const d   = src[currentMonth];
+  if (!d) return;
+  if (charts.gender) charts.gender.destroy();
+  const male   = d.male   || 0;
+  const female = d.female || 0;
+  const total  = male + female || 1;
+  const mp = (male   / total * 100).toFixed(1);
+  const fp = (female / total * 100).toFixed(1);
+  charts.gender = new Chart(
+    document.getElementById('chart-gender').getContext('2d'),
+    { type: 'doughnut',
+      data: {
+        labels: ['男', '女'],
+        datasets: [{ data: [male, female],
+          backgroundColor: ['#3b82f6','#ec4899'],
+          borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)}人 (${(ctx.raw/total*100).toFixed(1)}%)`
+          }}
+        }
+      }
+    }
+  );
+  document.getElementById('gender-legend').innerHTML =
+    `<span style="color:#3b82f6">●</span> 男 ${mp}%　<span style="color:#ec4899">●</span> 女 ${fp}%`;
+}
+
+// =====================================================================
 //  Render All
 // =====================================================================
 function renderAll() {
   document.getElementById('header-month').textContent = `${fmtM(currentMonth)} 現在`;
   renderCards();
+  renderGender();
   renderTrend();
   renderMap();
   renderMigration();
@@ -545,6 +687,7 @@ function renderAll() {
 window.addEventListener('load', () => {
   if (!window.POP_DATA) { document.body.innerHTML = '<p style="padding:2em">データ読み込みエラー</p>'; return; }
   initMonthSelect();
+  initCitySelect();
   renderAll();
 });
 </script>
