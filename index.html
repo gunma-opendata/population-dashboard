@@ -13,45 +13,54 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:           #f0fafa;
+      --bg:           #f4f5f7;
       --card:         #ffffff;
-      --border:       #cce8e8;
-      --text:         #0f2020;
-      --text-muted:   #5c7a7a;
-      --accent:       #0f766e;
-      --accent-light: #ccfbf1;
+      --border:       #e2e5ea;
+      --text:         #111827;
+      --text-muted:   #6b7280;
+      --accent:       #1d4ed8;
+      --accent-light: #dbeafe;
       --red:          #dc2626;
       --blue:         #2563eb;
       --green:        #16a34a;
       --orange:       #ea580c;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Hiragino Sans', 'Meiryo', sans-serif; font-size: 14px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', Meiryo, sans-serif; font-size: 14px; line-height: 1.5; }
 
     /* Header */
     .header {
-      background: var(--accent); color: #fff;
-      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
-      position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
-    .header h1 { font-size: 17px; font-weight: 700; }
-    .header .sub { font-size: 11px; opacity: .8; margin-top: 2px; }
-    .header-right { margin-left: auto; font-size: 11px; opacity: .75; }
+    .header-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .header-brand { display: flex; align-items: center; gap: 10px; }
+    .header-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--accent); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .header-title  { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+    .header-sub    { font-size: 11px; color: var(--text-muted); }
+    .header-meta   { font-size: 11px; color: var(--text-muted); text-align: right; line-height: 1.6; }
 
-    /* Month nav */
-    .month-nav {
-      background: var(--card); border-bottom: 1px solid var(--border);
-      padding: 10px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    /* Filter bar */
+    .filter-bar {
+      display: flex; align-items: center; gap: 10px;
+      background: white; border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 14px;
+      margin-bottom: 20px; flex-wrap: wrap;
     }
-    .month-nav label { font-size: 12px; color: var(--text-muted); }
-    .month-btn {
-      padding: 4px 12px; border: 1px solid var(--border); border-radius: 16px;
-      background: var(--bg); font-size: 12px; cursor: pointer; color: var(--text);
-    }
-    .month-btn:hover, .month-btn.active {
-      background: var(--accent); color: #fff; border-color: var(--accent);
-    }
-    #month-select {
-      padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px;
+    .filter-bar label { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .filter-bar select {
+      padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 13px; background: var(--card); color: var(--text);
     }
 
@@ -64,13 +73,13 @@
     @media (max-width: 860px) { .summary-row { grid-template-columns: 1fr; } }
     @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
     .gender-card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
       padding: 16px 18px; border-top: 3px solid var(--accent); min-width: 180px;
     }
     .gender-card .label { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
     .gender-donut-wrap { position: relative; height: 130px; }
     .stat-card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
       padding: 16px 18px; border-top: 3px solid var(--accent);
     }
     .stat-card .label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
@@ -88,7 +97,7 @@
     @media (max-width: 860px) { .row-2, .row-2-3 { grid-template-columns: 1fr; } }
 
     .card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
       padding: 18px 20px;
     }
     .card-title {
@@ -106,12 +115,20 @@
     .leaflet-top, .leaflet-bottom { z-index: 2 !important; }
 
     /* Toggle buttons */
-    .toggle-group { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-    .toggle-btn {
-      padding: 4px 12px; font-size: 11px; border-radius: 14px;
-      border: 1px solid var(--accent); background: #fff; color: var(--accent); cursor: pointer;
+    .chart-toggle-btns { display: flex; gap: 2px; }
+    .card-title-row {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 14px;
     }
-    .toggle-btn.active { background: var(--accent); color: #fff; }
+    .card-title-row .card-title { margin-bottom: 0; }
+    .toggle-btn {
+      padding: 3px 10px; font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: none;
+      border-radius: 6px; cursor: pointer; color: var(--text-muted);
+      transition: all .15s;
+    }
+    .toggle-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
 
     /* Map legend */
     .map-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
@@ -123,23 +140,28 @@
 </head>
 <body>
 
-<div class="header">
-  <div>
-    <h1>群馬県 人口動態ダッシュボード</h1>
-    <div class="sub">移動人口調査（月次）オープンデータ</div>
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-icon">👥</div>
+      <div>
+        <div class="header-title">群馬県 人口動態ダッシュボード</div>
+        <div class="header-sub">移動人口調査（月次）オープンデータ</div>
+      </div>
+    </div>
+    <div class="header-meta" id="header-month"></div>
   </div>
-  <div class="header-right" id="header-month"></div>
-</div>
-
-<div class="month-nav">
-  <label>表示月：</label>
-  <select id="month-select"></select>
-  <label style="margin-left:8px">市区町村：</label>
-  <select id="city-select"></select>
-  <div style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="data-range"></div>
-</div>
+</header>
 
 <div class="main">
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <label>表示月：</label>
+    <select id="month-select"></select>
+    <label>市区町村：</label>
+    <select id="city-select"></select>
+    <div style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="data-range"></div>
+  </div>
   <!-- Summary Cards -->
   <div class="summary-row">
     <div class="summary-grid">
@@ -175,19 +197,21 @@
   <!-- Trend -->
   <div class="row row-1">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        人口推移
-        <div class="toggle-group" style="margin:0">
-          <button class="toggle-btn" id="btn-range-12" onclick="setTrendRange(12)">1年</button>
-          <button class="toggle-btn" id="btn-range-36" onclick="setTrendRange(36)">3年</button>
-          <button class="toggle-btn" id="btn-range-60" onclick="setTrendRange(60)">5年</button>
-          <button class="toggle-btn active" id="btn-range-0" onclick="setTrendRange(0)">全期間</button>
-        </div>
-        <div class="toggle-group" style="margin:0;margin-left:auto">
-          <button class="toggle-btn active" id="btn-trend-pop" onclick="setTrendMode('pop')">総人口</button>
-          <button class="toggle-btn" id="btn-trend-change" onclick="setTrendMode('change')">前月増減</button>
-          <button class="toggle-btn" id="btn-trend-vital" onclick="setTrendMode('vital')">自然・社会増減</button>
-          <button class="toggle-btn" id="btn-trend-hh" onclick="setTrendMode('hh')">世帯数</button>
+      <div class="card-title-row">
+        <span class="card-title">人口推移</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <div class="chart-toggle-btns">
+            <button class="toggle-btn" id="btn-range-12" onclick="setTrendRange(12)">1年</button>
+            <button class="toggle-btn" id="btn-range-36" onclick="setTrendRange(36)">3年</button>
+            <button class="toggle-btn" id="btn-range-60" onclick="setTrendRange(60)">5年</button>
+            <button class="toggle-btn active" id="btn-range-0" onclick="setTrendRange(0)">全期間</button>
+          </div>
+          <div class="chart-toggle-btns">
+            <button class="toggle-btn active" id="btn-trend-pop" onclick="setTrendMode('pop')">総人口</button>
+            <button class="toggle-btn" id="btn-trend-change" onclick="setTrendMode('change')">前月増減</button>
+            <button class="toggle-btn" id="btn-trend-vital" onclick="setTrendMode('vital')">自然・社会増減</button>
+            <button class="toggle-btn" id="btn-trend-hh" onclick="setTrendMode('hh')">世帯数</button>
+          </div>
         </div>
       </div>
       <div class="chart-wrap-lg"><canvas id="chart-trend"></canvas></div>
